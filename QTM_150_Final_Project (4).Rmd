@@ -1,0 +1,239 @@
+---
+title: "QTM 150 Final Project"
+author: "Drug Enforcement Administration"
+date: "4/27/2019"
+output:
+  rmdformats::readthedown:
+    self_contained: true
+    thumbnails: false
+    lightbox: true
+    gallery: false
+    highlight: tango
+---
+
+# D(avid) Ji, E(rin) Sheena, A(ditya) Jhaveri
+
+```{r loadlib, echo=T, results='hide', message=F, warning=F}
+library(plyr)
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(knitr)
+```
+![](SAMHDA.png)  
+  
+# Data Methodology  
+  
+The data was taken from the National Survey of Substance Abuse Treatment Services in 2017.  
+You can find the data used for this project here:  
+https://www.datafiles.samhsa.gov/study-dataset/national-survey-substance-abuse-treatment-services-2017-n-ssats-2017-ds0001-nid18445 
+
+```{r}
+# Import Data
+NSDUH_2017_Tab <- read.delim("~/Desktop/NSDUH_2017_Tab.tsv")
+drugsurvey <- NSDUH_2017_Tab
+```
+
+# Chosen Variables 
+The variables chosen for analysis were:  
+How old were you the first time you smoked part or all of a cigarette?  
+CIGTRY - AGE WHEN FIRST SMOKED A CIGARETTE  
+  
+On the [CG07 days / CIGDKRE] you smoked cigarettes during the past 30 days, how many cigarettes did you smoke per day, on
+average?  
+CIG30AV - AVG # CIGS SMOKED PER DAY/ON DAY SMOKED  
+  
+![](CIG30AV.png)
+  
+Think about the first time you had a drink of an alcoholic beverage. How old were you the first time you had a drink of an alcoholic beverage? Please do not include any time when you only had a sip or two from a drink.  
+ALCTRY - AGE WHEN FIRST DRANK ALCOHOLIC BEVERAGE  
+  
+On the ALC30DAY/ALCESTFL days that you drank during the past 30 days, how many drinks did you usually have? Count as a drink
+a can or bottle of beer; a wine cooler or a glass of wine, champagne, or sherry; a shot of liquor or a mixed drink or cocktail.  
+ALCUS30D - USUAL # OF DRINKS PER DAY PAST 30 DAYS  
+  
+This question is about your overall health. Would you say your health in general is excellent, very good, good, fair, or poor?  
+HEALTH - OVERALL HEALTH  
+  
+Gender (Male or Female)  
+IRSEX Len : 1 IMPUTATION REVISED GENDER  
+  
+Race  
+NEWRACE2 Len : 1 RC-RACE/HISPANICITY RECODE (7 LEVELS)  
+
+# Cleaning Dataset 
+```{r}
+drugsrecoded<-drugsurvey %>%
+  select(CIGTRY, CIG30AV, ALCTRY, ALCUS30D, HEALTH, IRSEX, NEWRACE2)
+drugsclean<-drugsrecoded
+```
+
+## Recode Tobacco Variables 
+```{r}
+drugsclean$CIGTRY <- revalue(as.factor(drugsrecoded$CIGTRY), c("985" = NA, "991" = NA, "994" = NA, "997" = NA)) 
+
+drugsclean$CIG30AV <-revalue(as.factor(drugsrecoded$CIG30AV), c("1" = "Less than one cigarette per day", "2" = "1 cigarette per day", "3" = "2 to 5 cigarettes per day", "4" = "6 to 15 cigarettes per day", "5" = "16 to 25 cigarettes per day", "6" = "26 to 35 cigarettes per day", "7" = "more than 35 cigs per day", "85" = NA, "91" = NA, "93" = NA, "94" = NA, "97" = NA, "98" = NA)) #
+```
+
+## Recode Alcohol Variables 
+```{r}
+drugsclean$ALCTRY[drugsclean$ALCTRY== "985" | drugsclean$ALCTRY=="991"| drugsclean$ALCTRY=="994"| drugsclean$ALCTRY=="997"| drugsclean$ALCTRY=="998"] <- NA
+
+drugsclean$ALCUS30D[drugsrecoded$ALCUS30D== "975" | drugsrecoded$ALCUS30D=="985"| drugsrecoded$ALCUS30D=="991"| drugsrecoded$ALCUS30D=="993"| drugsrecoded$ALCUS30D=="994" | drugsrecoded$ALCUS30D=="997" | drugsrecoded$ALCUS30D=="998"] <- NA
+
+```
+
+## Recode Demographics Variables 
+```{r}
+drugsclean$HEALTH <- revalue(as.factor(drugsrecoded$HEALTH), c("1" = "Excellent", "2" = "Very good", "3"= "Good", "4" = "Fair", "5" = "Poor", "94" = NA, "97" = NA))
+
+drugsclean$IRSEX <- revalue(as.factor(drugsrecoded$IRSEX), c("1" = "Male", "2" = "Female"))
+
+drugsclean$NEWRACE2 <- revalue(as.factor(drugsrecoded$NEWRACE2), c("1" = "NonHisp White", "2" = "NonHisp Black/Afr Am", "3" = "NonHisp Native Am/AK Native", "4" = "NonHisp Native HI/Other Pac Isl", "5" = "NonHisp Asian", "6" = "NonHisp more than one race", "7" = "Hispanic"))
+
+```
+
+# Research Question 1 
+
+What is the relationship between health and cigarette or alcohol usage by sex? 
+
+# Visualization Part 1 
+
+## Figure 1 
+```{r,fig.height=4., fig.width=12}
+drugs5<-drugsclean %>%
+  select(CIG30AV, HEALTH, IRSEX)
+drugsomit2 <- na.omit(drugs5)
+
+ggplot(drugsomit2, aes(CIG30AV))+ 
+  geom_bar(aes(fill=IRSEX)) +
+  facet_grid(~ HEALTH, scales = "free") +
+  coord_flip()+
+  labs(x="Cigarette Usage",y="Frequency",title="Figure 1: Cigarette Usage Frequency by Health", fill = "Sex")+
+  theme_gray()
+```
+
+## Analysis of Cigarette Usage 
+```{r}
+#Calculate average cigarette usage by health
+avgciguse <- drugsomit2 %>%
+  group_by(HEALTH) %>%
+  summarise(group_cigarette_usage = mean(as.numeric(CIG30AV)))
+
+#change to ascending order
+avgciguse1 <- avgciguse[order(avgciguse$group_cigarette_usage),]
+
+#break down average cigarette usage by health and sex
+avgcigusewsex <- drugsomit2 %>%
+  group_by(HEALTH, IRSEX) %>%
+  summarise(group_cigarette_usage = mean(as.numeric(CIG30AV)))
+
+#change to ascending order
+avgciguse2 <- avgcigusewsex[order(avgcigusewsex$group_cigarette_usage),]
+
+kable(avgciguse1)
+kable(avgciguse2)
+```
+  
+Figure 1 shows that average cigarette usage decreases steadily from poor to excellent health, with an overall difference of 1.24 between the highest and lowest groups. This number represents the average range of cigarettes represented in this group, as the average cigarette usage variable is given in this survey as ranges instead of true values. Conditioning for sex, average cigarette usage in males is consistently higher than females for all respective health groups, with an exception in the poor health group in which females have higher amounts of cigarette usage. The excellent health group had an average number of cigarettes smoked an average of between 1 and 2 cigarettes. By contrast, the poor health group smoked an average of between 10 and 20 cigarettes. These results are logical because cigarettes have been proven to be negative for one’s health. Therefore, those that smoke fewer cigarettes report a higher health. 
+
+## Figure 2
+```{r,fig.height=4., fig.width=12}
+drugs6<-drugsclean %>%
+  select(ALCUS30D, HEALTH, IRSEX) %>%
+  filter(ALCUS30D<=25)
+drugsomit3 <- na.omit(drugs6)
+
+ggplot(drugsomit3, aes(ALCUS30D))+ 
+  geom_bar(aes(fill=IRSEX)) +
+  facet_grid(~ HEALTH, scales = "free") +
+  coord_flip() + 
+  labs(x="Alcohol Usage",y="Frequency",title="Figure 2: Alcohol Usage Frequency by Health", fill = "Sex")+
+  theme_gray()
+```
+
+## Analysis of Alcohol Usage 
+```{r}
+#Calculate average alcohol use by health
+avgalcuse <- drugsomit3 %>%
+  group_by(HEALTH) %>%
+  summarise(alcoholuse = mean(as.numeric(ALCUS30D)))
+
+
+#change to ascending order
+avgalcuse1 <- avgalcuse[order(avgalcuse$alcoholuse),]
+
+
+#break down average alcohol use by health and sex
+avgalcusewsex <- drugsomit3 %>%
+  group_by(HEALTH, IRSEX) %>%
+  summarise(alcoholuse = mean(as.numeric(ALCUS30D)))
+
+
+#change to ascending order
+avgalcuse2 <- avgalcusewsex[order(avgalcusewsex$alcoholuse),]
+
+kable(avgalcuse1)
+kable(avgalcuse2)
+```
+  
+Figure 2 shows average alcohol usage also decreases from poor to excellent health groups, with an overall difference of .68 drinks between the excellent and poor health groups. This variable in measured in exact amount of days that alcohol was drunk, contrary to the range values of the cigarette usage. Controlling for sex, the lowest male alcohol usage average (3.15) from the excellent health group was higher than the highest female alcohol usage average (2.87) while trends remained similar in both groups, indicating an extremely different usage of alcohol among the sexes. The excellent health group drank an average of 2.74 drinks, while the poor health group drank an average of 3.41 drinks. This data is logical because drinking too much alcohol can be harmful to one’s health, so naturally people that tend to drink more alcohol have worse health. 
+
+
+# Research Question 2
+
+What effect does race have on the age of first drinking alcohol and first smoking cigarettes?
+
+# Visualization Part 2 
+
+## Figure 3 
+```{r,fig.height=6., fig.width=8}
+drugs7<-drugsclean %>%
+  select(ALCTRY, NEWRACE2)
+drugsomit4 <- na.omit(drugs7)
+
+ggplot(drugsomit4, aes(x=NEWRACE2, y=ALCTRY))+
+  geom_boxplot(aes(fill=NEWRACE2))+
+  labs(x = "Race", y = "Age First Tried Alcohol", title = "Figure 3: Summary of First Tried Alcohol by race", fill = "Race")+
+  coord_flip()
+
+```
+
+## Analysis of Figure 3 
+```{r}
+#calculate mean age of first trying alcohol by race
+ALCTRY1 <- drugsomit4 %>%
+  group_by(NEWRACE2) %>%
+  summarise(mean = mean(ALCTRY))
+kable(ALCTRY1)
+```
+  
+Figure 3 shows that with regards to drinking, non-hispanics that are more than one race try drinking on average at the youngest age of 16.13519 years old. This is followed by non-hispanic Native American/Alaskan Native (16.18412 years old), non-hispanic White (16.44429 years old), Hispanic (16.99213 years old), and then non-hispanic Native Hawaiian/Other Pacific Islander (17.21605 years old), and non-hispanic Black/African American (17.21605 years old). The group that first tried drinking at the average highest age was non-hispanic Asian at 18.73338 years old. 
+
+## Figure 4 
+```{r,fig.height=6., fig.width=8}
+drugs8<-drugsclean %>%
+  select(CIGTRY, NEWRACE2)
+drugsomit5 <- na.omit(drugs8)
+
+ggplot(drugsomit5, aes(x=NEWRACE2, y=as.numeric(CIGTRY)))+
+  geom_boxplot(aes(fill=NEWRACE2))+
+  labs(x = "Race", y = "Age First Tried Cigarette", title = "Figure 4: Summary of First Tried Cigarette by race", fill = "Race")+
+  coord_flip()
+```
+
+## Analysis of Figure 4
+```{r}
+#calculate mean age of first trying cigarettes by race
+CIGTRY1 <- drugsomit5 %>%
+  group_by(NEWRACE2) %>%
+  summarise(mean = mean(as.numeric(CIGTRY)))
+kable(CIGTRY1)
+```
+  
+Figure 4 shows that with regards to smoking, non-hispanic Native American/Alaskan Native first tried smoking cigarettes at the youngest average age at 15.08588 years old. This is followed by non-hispanic more than one race (15.41581 years old), non-hispanic Native Hawaiian/Other Pacific Islander (15.63889 years old), non-hispanic White (15.64057 years old), Hispanic (16.19805 years old), and then non-hispanic Black/African American (17.00321 years old). The race with the highest average age of first smoking a cigarette was non-hispanic Asian at 17.67912 years old.
+
+## Comparison of Figure 3 and Figure 4 
+These results show us the average ages people of different races first try smoking and drinking. These results are interesting because the races non-hispanic Native American/Alaskan Native and non-hispanic more than one race have the youngest average ages of both first trying alcohol and smoking. By contrast, non-hispanic Asian is the race with the oldest average age to first trying smoking and alcohol, and non-hispanic Black/African American is the race with the second oldest average age to first trying smoking and alcohol. Therefore, the opposite ends of the spectrum for first trying drinking and smoking remain relatively constant. A limitation of this data is that there are many outliers, making it less reliable. 
+
+
