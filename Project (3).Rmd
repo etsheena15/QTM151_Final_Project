@@ -1,0 +1,173 @@
+---
+title: "QTM 151 Project"
+author: "Erin Sheena"
+date: "4/19/2020"
+output:
+  rmdformats::readthedown: default
+  pdf_document: default
+---
+
+# Introduction
+
+  Drug use is widely believed to be correlated with wealth and race. Specifically, cocaine is a popular recreational drug that is highly addictive and cocaine-related deaths have been prominent in recent years. Seeing that there are many narratives about drug use in the news and that drug overdose is a rising cause of death in the United States, I was particularly interested in studying the relationship between cocaine usage and three main factors, citizenship status, race, and age. I split this into two main questions: within the sample population of those that have used cocaine in the past year, how does usage vary with citizenship status, what about race;  how does the last time an individual used cocaine vary with age? Due to the historic marginalization and oppression of Black individuals in America, I hypothesize that this group will likely have higher cocaine usage, and I also predict that non US citizens, who are more likely to be minorities with inadequate access to proper resources, have higher cocaine usage. I also hypothesize that younger people in their teens and twenties are the most likely age group to have used cocaine most recently, possibly because they are more risk-seeking and experiment at that stage in their lives. 
+  
+# Methods
+
+  First, I downloaded the “Drug Use” and “Demographics” datasets from the NHANES 2015-16 data wave. All of the variable names were in code, so I renamed and selected for the variables I wanted to work with. These included “last time you used cocaine/unit”, “number of times you used cocaine”, age, citizenship status, and race. Next, I used the participant ID to merge the two datasets together. Then, I changed the categorical variables to factor levels and renamed the coded factors to what they actually stood for. I also coded “other” and “missing” answers to be NA, and then removed them. For our first question, I made an interactive bar plot comparing race with the “number of times you used cocaine”. For our second question, I made an interactive boxplot to compare age and cocaine usage. As age increases, there are increasing opportunities to do cocaine, so I decided to use the variable “last time you used cocaine/unit” to get rid of this skew.
+
+# Import Data Sets and Libraries
+
+```{r, warning = FALSE, message = FALSE}
+library("reshape")
+#install.packages("Hmisc")
+#install.packages("SASxport")
+#install.packages("htmlTable")
+library("SASxport")
+#install.packages("backports")
+#install.packages("tidyverse")
+library(plyr)
+library(tidyverse)
+library(plotly)
+#remove.packages('xfun')
+#install.packages('xfun')
+library(rmdformats)
+setwd("C:/Users/etshe/OneDrive/Documents/R")
+drugs <- read.xport("DUQ_I.XPT")
+demographics <- read.xport("DEMO_I.XPT")
+```
+
+# Cleaning the Data Set
+
+Rename and Select Columns:
+```{r}
+drugs2<- drugs %>% rename(
+ "last_use" = DUQ270U,
+ "number of times you used cocaine" = DUQ272,
+ "ID" = SEQN
+) %>% select("last_use","number of times you used cocaine", "ID")
+
+demographics2 <- demographics %>% rename(
+  "Annual Household Income" = INDHHIN2,
+  "Citizenship Status" = DMDCITZN,
+  "Race/Hispanic origin with NH Asian" = RIDRETH3,
+  "ID" = SEQN,
+  "Age" = RIDAGEYR
+) %>% select( "Citizenship Status", "Race/Hispanic origin with NH Asian", "ID" , "Age")
+```
+
+Merge the Datasets:
+```{r}
+df <- inner_join(drugs2, demographics2, by = "ID")
+df1 <- df #make a copy of the data set
+```
+
+Rename and assign factors:
+```{r, message = FALSE}
+df1$`last_use` <- as.factor(df1$`last_use`)
+df1$`last_use` <- mapvalues(df1$`last_use`, from = c("1", "2", "3", "4", "7", "9"), to = c("Days", "Weeks", "Months", "Years", NA, NA))
+```
+
+```{r}
+df1$`number of times you used cocaine` <- as.factor(df1$`number of times you used cocaine`) 
+df1$`number of times you used cocaine`<- mapvalues(df1$`number of times you used cocaine`, from = c("1", "2", "3", "4", "5", "6"), to = c("Once", "2-5 times", "6-19 times", "20-49 items", "50-99 times", "100 times or more"))
+```
+
+```{r}
+df1$`Citizenship Status`<- as.factor(df1$`Citizenship Status`)
+df1$`Citizenship Status` <- mapvalues(df1$`Citizenship Status`, from = c("1", "2", "7", "9"), to = c("citizen", "not citizen", NA, NA))
+```
+
+```{r}
+df1$`Race/Hispanic origin with NH Asian` <- as.factor(df1$`Race/Hispanic origin with NH Asian`)
+df1$`Race/Hispanic origin with NH Asian` <- mapvalues(df1$`Race/Hispanic origin with NH Asian`, from = c("1", "2", "3", "4", "6", "7"), to = c("Mexian American", "Other Hispanic", "Non-Hispanic White", "Non-Hispanic Black", "Non-Hispanic Asian", "Other Race/MultiRacial"))
+
+```
+
+Change to characters:
+```{r}
+df1$'Race' <- as.character(df1$`Race/Hispanic origin with NH Asian`)
+df1$'Citizen Status' <- as.character(df1$`Citizenship Status`)
+df1$'Use' <- as.character(df1$`number of times you used cocaine`)
+
+```
+
+Remove NAs:
+```{r}
+df2 <- df1[!is.na(df1$Use) & !is.na(df1$`Citizen Status`),]
+
+```
+
+# Research Question 1
+
+Within the sample population of those that have used cocaine within the past year, how does usage vary with race? What about citizenship status? 
+
+```{r}
+p <- ggplot(df2, aes(`Race`, fill = `Use`)) +
+  geom_bar(position = "fill") + labs(y = "Proportion", x= "Race")
+
+
+p %>%
+  ggplotly(layerData = 1, originalData = FALSE) %>%
+ plotly_data()
+
+
+fig <- ggplotly(p, originalData = FALSE) %>%
+  mutate(ydiff = ymax - ymin) %>% 
+  add_text(
+    x = ~x, y = ~(ymin + ymax) / 2,
+    text =  ~ifelse(ydiff > 0.02, round(ydiff, 2), ""),
+    showlegend = FALSE, hoverinfo = "none",
+    color = I("black"), size = I(9)
+  ) %>% layout(title =  "Proportional Bar Plot of Race and Cocaine Usage")
+
+fig
+
+```
+
+
+```{r}
+p <- ggplot(df2, aes(`Citizen Status`, fill = `Use`)) +
+  geom_bar(position = "fill") + labs(y = "Proportion", x= "Citizenship Status")
+
+  p %>%
+  ggplotly(layerData = 1, originalData = FALSE) %>%
+ plotly_data()
+
+
+ggplotly(p, originalData = FALSE) %>%
+  mutate(ydiff = ymax - ymin) %>% 
+  add_text(
+    x = ~x, y = ~(ymin + ymax) / 2,
+    text = ~ifelse(ydiff > 0.02, round(ydiff, 2), ""),
+    showlegend = FALSE, hoverinfo = "none",
+    color = I("black"), size = I(9), 
+  ) %>% layout(title =  "Proportional Bar Plot of Citizenship and Cocaine Usage")
+```
+
+## Results
+
+  For the first graph, I created a proportional bar graph to visualize the different proportions of cocaine usage within the past year grouped by their identified race. For all the races excluding Non-Hispanic Blacks and Other Race/MultiRacial, the highest proportion of cocaine use is 2-5 times. For Non-Hispanic Blacks, the highest proportion, at 0.31 percent, is 100 times or more. Non-Hispanic blacks have the largest proportion of cocaine use 100 times or more than any other racial group. Mexican Americans have the largest proportion of one time cocaine use and 0.01 percent less than the largest proportion of 2-5 time cocaine use. 
+  For the second graph, I created a proportional bar graph to visualize the different proportions of cocaine usage within the past year grouped by their citizenship status.  Among citizens, the highest proportion of cocaine use is 2-5 times, at 25%. Among non-citizens, the highest proportion of cocaine use is actually split equally between use of 2-5 times and 6-19 times, both comprising 27% of this population. The smallest proportion of cocaine use among citizens is once, at 8%, and the smallest proportion of cocaine use among non-citizens is 100 times or more, at 1.9%. 
+
+## Conclusion
+
+  Non-Hispanic blacks are most likely to face racial inequalities, which may be an explanation as to why they are the racial group with the highest proportion of cocaine use 100 times or more. For example, a large percentage of individuals below the poverty line are African Americans, which could lead to the increase in drug use. 
+  I can conclude now that the majority of people who use cocaine use it 2-5 times per year; however, among non-citizens, more people use cocaine slightly more often, at 6-19 times per year. This could be because non-citizens are likely to live in more underdeveloped neighborhoods and thus be exposed to areas where drug consumption is more prevalent. Among citizens, the least common cocaine use is just once, which makes sense because cocaine is known to be an addictive drug, so if used once, the threshold for use again is very low and probable. Among non-citizens, however, the least common cocaine use is over 100 times, perhaps because cocaine is expensive to acquire.
+
+# Research Question 2
+
+How does the last time an individual used cocaine vary with age?
+
+```{r, warning = FALSE}
+x <- list(title = "Last time you used cocaine")
+plot_ly(df2, x = ~last_use, y=~Age) %>% add_boxplot() %>% layout(title = "Boxplot of Age by last time you used cocaine", xaxis = x)
+
+```
+
+## Results
+
+  The variable last did cocaine had four different groups, where individuals answered that they last did cocaine days, weeks, months, or years ago. The lowest average age group last did cocaine weeks ago, where the mean age of the group was 26 years old. This was followed by the last used cocaine months ago group, where the mean age was 28.5 years old. Next, the last used cocaine days ago group had users with a mean age of 31.5 years old. Finally, the group last used cocaine years ago had the highest mean age at 44 years old. 
+
+## Conclusion
+
+  The results were surprising that the most recent users were not the youngest users. Rather the group that last used cocaine days ago the second highest mean age of 31.5 years old. This is likely because individuals that used cocaine days ago are more likely to be regular cocaine users. By contrast, groups with lower average ages (e.g. last used cocaine weeks or months ago) are likely infrequent users and perhaps use cocaine in more social contexts (i.e. parties), where the mean ages are 26 and 28.5years respectively. This data is contrary to the perception that younger people are more likely to have used cocaine more recently because they are experimenting with drugs, more susceptible to peer pressure, partying more, etc. Finally, the most understandable data is that the last used cocaine years ago group had the highest mean age of 44 years old. This is because older adults are more likely to have stable jobs, children, etc. that prohibits them from using cocaine, increases their social responsibility to others so they no longer do cocaine, minimizes social events where drugs like cocaine are present (i.e. parties), etc. 
